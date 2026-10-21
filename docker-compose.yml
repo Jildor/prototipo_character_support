@@ -1,0 +1,12 @@
+# Se ejecuta DESDE DEBIAN (WSL2): docker compose up --build
+name: prototipo-character-support
+
+services:
+  web:
+    build: .
+    # Red del host (Debian): el contenedor ve el túnel SSH en 127.0.0.1 y Windows ve la web en localhost
+    network_mode: host
+    volumes:
+      - ./:/app
+    command: php -S 0.0.0.0:${PORT:-8090} -t public
+    restart: "no"

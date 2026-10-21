@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Character Support</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+    <h1>Character Support <span class="tag">prototipo</span></h1>
+    <div id="connection" class="muted">Conectando…</div>
+</header>
+
+<main>
+    <section class="col">
+        <div class="card">
+            <h2>1. Buscar personaje</h2>
+            <form id="search-form" class="row">
+                <input id="search" placeholder="Nombre o guid" autocomplete="off" required>
+                <button>Buscar</button>
+            </form>
+            <div id="character"></div>
+        </div>
+
+        <div class="card" id="actions" hidden>
+            <h2>2. Pedir soporte</h2>
+
+            <h3>Desatascar</h3>
+            <p class="muted" id="unstuck-dest"></p>
+            <div id="unstuck-checks"></div>
+            <button id="btn-unstuck">Desatascar personaje</button>
+
+            <h3>Cambiar de cuenta</h3>
+            <form id="change-form" class="row">
+                <input id="target-account" placeholder="Cuenta destino (nombre o id)" autocomplete="off" required>
+                <button>Cambiar de cuenta</button>
+            </form>
+
+            <label class="check">
+                <input type="checkbox" id="skip-checks">
+                Saltar las comprobaciones de la web (para probar las del servidor)
+            </label>
+            <div id="action-result"></div>
+        </div>
+
+        <details class="card">
+            <summary><h2>Inserción manual (pruebas)</h2></summary>
+            <p class="muted">Inserta sin ninguna comprobación, como desde SQLyog. Sirve para probar parámetros
+                inválidos, JSON mal formado o tipos desconocidos. La web real no debe hacer esto.</p>
+            <form id="raw-form" class="grid">
+                <label>guid <input id="raw-guid" type="number" min="0" required></label>
+                <label>type <input id="raw-type" type="number" min="0" max="255" value="10" required></label>
+                <label class="wide">params <input id="raw-params" placeholder='{"account": 1}  (vacío = NULL)'></label>
+                <button class="wide">Insertar</button>
+            </form>
+            <div id="raw-result"></div>
+        </details>
+    </section>
+
+    <section class="col">
+        <div class="card">
+            <div class="row between">
+                <h2>3. Peticiones <span class="muted small" id="requests-filter"></span></h2>
+                <label class="check small"><input type="checkbox" id="only-character" checked> Solo este personaje</label>
+            </div>
+            <p class="muted small">Se actualiza cada 3 s. Una petición queda "Pendiente" hasta el siguiente ciclo del
+                worldserver (CharacterSupport.Interval).</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr><th>id</th><th>Personaje</th><th>Acción</th><th>Estado</th><th>Resultado</th><th>Creada</th><th>Espera</th></tr>
+                    </thead>
+                    <tbody id="requests"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <details class="card" id="sql-card" open>
+            <summary><h2>SQL de la última acción</h2></summary>
+            <p class="muted small">Consultas exactas que ha lanzado la web en la última búsqueda o petición.</p>
+            <div id="sql"></div>
+        </details>
+    </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
