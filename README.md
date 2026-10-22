@@ -6,6 +6,8 @@ Prototipo de ejemplo del sistema **Character Support** de NaerEmu: la web pide a
 El objetivo es que el equipo web vea el funcionamiento completo y sepa qué tiene que implementar. **No es código
 para producción**: no tiene inicio de sesión y deja saltarse las comprobaciones para hacer pruebas.
 
+**Equipo web:** empezad por la [guía de integración](docs/INTEGRACION.md).
+
 ## Cómo funciona
 
 ```
@@ -103,86 +105,16 @@ insertar para avisar al momento. Las consultas están en `CharacterSupport::find
 4. **SQL de la última acción**: las consultas exactas que ha lanzado la web, con sus parámetros.
 5. **Inserción manual**: inserta sin comprobar nada (JSON mal formado, parámetros inválidos, tipos desconocidos).
 
-## Contrato con la BD
+## Para el equipo web
 
-### Tabla `characters.character_support`
-
-| Columna | La escribe | Significado |
-|---|---|---|
-| `id` | BD | Id de la petición (`LAST_INSERT_ID()` tras insertar) |
-| `guid` | Web | `characters.guid` del personaje |
-| `type` | Web | 10 = cambio de cuenta, 11 = desatascar |
-| `params` | Web | JSON con los parámetros del tipo, o `NULL`. Generarlo **siempre** con `json_encode` |
-| `requested_by` | Web | Quién lo pide (cuenta web, GM…), para auditoría |
-| `status` | worldserver | 0 pendiente, 1 hecho, 2 error |
-| `result_code` | worldserver | Motivo (tabla de abajo) |
-| `created_at` / `processed_at` | BD / worldserver | Fechas de creación y de cierre |
-
-Solo puede haber **una petición pendiente** del mismo tipo por personaje. Un segundo `INSERT` falla con el
-error **1062** ("ya tienes una petición en curso"). Las peticiones cerradas no cuentan.
-
-### Tipos
-
-| `type` | Acción | `params` |
-|---|---|---|
-| 10 | Cambiar el personaje de cuenta (si está conectado, se le expulsa) | `{"account": <id cuenta destino>}` |
-| 11 | Desatascar: Alianza → Páramos de Poniente, Horda → Los Baldíos. Debe estar desconectado | `NULL` |
-
-### Códigos de resultado
-
-| Código | Significado |
-|---|---|
-| 0 | Hecho |
-| 1 | El personaje no existe o está borrado |
-| 2 | Parámetros inválidos |
-| 3 | Caducada (más de `CharacterSupport.ExpireHours` pendiente) |
-| 4 | Conectado, entrando al mundo o desconectado hace menos de 60 s (en la selección de personajes sí se permite) |
-| 20 | La cuenta destino no existe |
-| 21 | Ya está en esa cuenta |
-| 22 | Cuenta destino sin huecos |
-| 23 | Cuenta destino con el máximo de Caballeros de la Muerte |
-| 24 | Cuenta origen con ban activo |
-| 25 | Cuenta destino con ban activo |
-| 40 | En ruta de vuelo |
-| 41 | En campo de batalla o arena |
-| 42 | Caballero de la Muerte en su zona de inicio |
-| 43 | Mapa no válido |
-| 44 | Desatascado hace menos de `CharacterSupport.Unstuck.Cooldown` minutos (60 por defecto) |
-
-### Consultas
-
-```sql
--- Crear petición
-INSERT INTO character_support (guid, type, params, requested_by) VALUES (?, 10, ?, ?);  -- params = json_encode(['account' => 456])
-INSERT INTO character_support (guid, type, params, requested_by) VALUES (?, 11, NULL, ?);
-
--- Resultado de una petición
-SELECT status, result_code, created_at, processed_at FROM character_support WHERE id = ?;
-
--- Historial de un personaje
-SELECT id, type, status, result_code, created_at, processed_at FROM character_support WHERE guid = ? ORDER BY id DESC;
-```
-
-El resto de consultas (comprobaciones previas) están en `src/CharacterSupport.php`, comentadas.
-
-## Qué debe hacer la web real
-
-1. **Comprobar que el personaje es del usuario conectado** (o que quien lo pide es staff). El prototipo no lo
-   hace porque no tiene inicio de sesión.
-2. **Comprobaciones previas** antes de insertar, para avisar al momento:
-   - **Desatascar**: no borrado, desconectado desde hace al menos 60 s, sin tiempo de espera pendiente y sin
-     otra petición en curso.
-   - **Cambio de cuenta**: la cuenta destino existe, sin bans en ninguna de las dos cuentas, con huecos libres y
-     con el límite de Caballeros de la Muerte.
-3. **Insertar** con consultas preparadas y `params` generado con `json_encode`.
-4. **Mostrar el resultado**: consultar la petición por su `id` hasta que `status` deje de ser 0, y traducir
-   `result_code` a un mensaje. Los textos del prototipo están en `CharacterSupport::RESULT_MESSAGES`.
-5. **Informar de la espera**: el servidor procesa las peticiones cada minuto.
+Todo lo necesario para implementarlo en la web real (tabla, tipos, códigos de resultado, consultas, flujo de cada
+acción, seguridad y casos especiales) está en **[docs/INTEGRACION.md](docs/INTEGRACION.md)**.
 
 ## Ficheros
 
 | Fichero | Qué es |
 |---|---|
+| `docs/INTEGRACION.md` | **Guía para el equipo web** |
 | `src/CharacterSupport.php` | **Lógica de la web**: comprobaciones, inserción y consulta. Es lo que hay que reproducir |
 | `src/Db.php` | Conexión PDO. Registra el SQL ejecutado solo para mostrarlo en el prototipo |
 | `public/api.php` | API JSON que usa la página |
