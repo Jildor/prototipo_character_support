@@ -56,14 +56,23 @@ final class CharacterSupport
     private const ALLIANCE_RACES = [1, 3, 4, 7, 11];
     private const CLASS_DEATH_KNIGHT = 6;
 
+    /**
+     * @param string|null $authDb BD de cuentas, accesible con la misma conexión. null = sin acceso: no se resuelven
+     *                            nombres de cuenta ni se comprueban la existencia ni los bans (el worldserver sí lo hace).
+     */
     public function __construct(
         private Db $db,
-        private string $authDb,
+        private ?string $authDb,
         private array $realm,
     ) {
-        if (!preg_match('/^[A-Za-z0-9_]+$/', $authDb)) {
+        if ($authDb !== null && !preg_match('/^[A-Za-z0-9_]+$/', $authDb)) {
             throw new InvalidArgumentException('Nombre de BD auth no válido');
         }
+    }
+
+    public function hasAuth(): bool
+    {
+        return $this->authDb !== null;
     }
 
     // ------------------------------------------------------------------ Consultas
@@ -96,17 +105,24 @@ final class CharacterSupport
         $row['alliance'] = in_array($row['race'], self::ALLIANCE_RACES, true);
 
         $ownerId = $row['deleted'] ? (int) $row['deleteInfos_Account'] : $row['account'];
-        $owner = $this->findAccount((string) $ownerId);
+        $owner = $this->hasAuth() ? $this->findAccount((string) $ownerId) : null;
         $row['account_name'] = $owner['username'] ?? null;
 
         return $row;
     }
 
-    /** Busca una cuenta por id o por nombre de usuario. */
+    /**
+     * Busca una cuenta por id o por nombre de usuario.
+     * Sin BD auth solo acepta un id numérico y no comprueba que exista (username = null).
+     */
     public function findAccount(string $idOrName): ?array
     {
         $idOrName = trim($idOrName);
         $id = ctype_digit($idOrName) ? (int) $idOrName : 0;
+
+        if (!$this->hasAuth()) {
+            return $id ? ['id' => $id, 'username' => null] : null;
+        }
 
         $row = $this->db->query(
             "SELECT id, username FROM `{$this->authDb}`.account WHERE id = ? OR username = ? LIMIT 1",
@@ -234,16 +250,19 @@ final class CharacterSupport
             $errors[] = self::RESULT_MESSAGES[1];
         }
         if (!$target) {
-            return [...$errors, self::RESULT_MESSAGES[20]];
+            return [...$errors, $this->hasAuth() ? self::RESULT_MESSAGES[20] : 'Sin BD auth, la cuenta destino debe ser un id numérico.'];
         }
         if ($target['id'] === $char['account']) {
             $errors[] = self::RESULT_MESSAGES[21];
         }
-        if ($this->isAccountBanned($char['account'])) {
-            $errors[] = self::RESULT_MESSAGES[24];
-        }
-        if ($this->isAccountBanned($target['id'])) {
-            $errors[] = self::RESULT_MESSAGES[25];
+        // Los bans están en la BD auth. Sin ella, solo los comprueba el worldserver (códigos 24 y 25)
+        if ($this->hasAuth()) {
+            if ($this->isAccountBanned($char['account'])) {
+                $errors[] = self::RESULT_MESSAGES[24];
+            }
+            if ($this->isAccountBanned($target['id'])) {
+                $errors[] = self::RESULT_MESSAGES[25];
+            }
         }
         if ($this->countCharacters($target['id']) >= (int) $this->realm['characters_per_realm']) {
             $errors[] = self::RESULT_MESSAGES[22];

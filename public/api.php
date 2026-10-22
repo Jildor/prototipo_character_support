@@ -22,7 +22,7 @@ try {
     respond(false, null, ['No se puede conectar a la BD (¿está abierto el túnel SSH?): ' . $e->getMessage()]);
 }
 
-$cs = new CharacterSupport($db, $config['db']['auth_db'], $config['realm']);
+$cs = new CharacterSupport($db, ($config['db']['auth_db'] ?? null) ?: null, $config['realm']);
 $input = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
 $action = $_GET['action'] ?? '';
 $requestedBy = (string) ($config['requested_by'] ?? 'prototipo');
@@ -32,7 +32,7 @@ try {
         case 'status':
             $version = $db->query('SELECT VERSION()')->fetchColumn();
             $hasV2 = (bool) $db->query("SHOW COLUMNS FROM character_support LIKE 'params'")->fetch();
-            respond(true, ['version' => $version, 'table_v2' => $hasV2, 'realm' => $config['realm']],
+            respond(true, ['version' => $version, 'table_v2' => $hasV2, 'auth' => $cs->hasAuth(), 'realm' => $config['realm']],
                 $hasV2 ? [] : ['La tabla character_support no es la v2: aplica el SQL 2026_10_21_100_characters_character_support.sql.']);
 
         case 'character':

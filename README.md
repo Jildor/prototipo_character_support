@@ -35,10 +35,16 @@ Todo se hace desde la consola de **Debian**.
    ```
 2. Abrir el túnel SSH a la máquina de desarrollo, en **otra consola de Debian** (déjala abierta):
    ```bash
-   ssh -N -L 127.0.0.1:13306:127.0.0.1:3306 usuario@maquina-desarrollo
+   ssh -N -L 127.0.0.1:13306:127.0.0.1:3306 usuario_ssh@IP_MAQUINA_DESARROLLO
+   # si el SSH no está en el puerto 22:  ssh -N -p 2222 -L ... usuario_ssh@IP_MAQUINA_DESARROLLO
    ```
-   Así, el puerto 13306 local lleva al MariaDB (3306) de la máquina de desarrollo. Si MariaDB escucha en
-   otro puerto o en otra IP, cambia la parte `127.0.0.1:3306`.
+   - `usuario_ssh@IP_MAQUINA_DESARROLLO`: los mismos datos con los que entras por SSH (o los de la pestaña SSH
+     de SQLyog). Ahí va la IP o el dominio de la máquina.
+   - `127.0.0.1:13306` (primera parte): el puerto local por el que se conecta el prototipo (`host` y `port` de
+     `config.php`). No hace falta tocarlo.
+   - `127.0.0.1:3306` (segunda parte): dónde está MariaDB **visto desde la máquina de desarrollo**. Si MariaDB
+     está en esa misma máquina se deja así; si no, pon su IP y puerto.
+   - Pedirá la contraseña o usará tu clave SSH y se quedará "colgado" sin mostrar nada: eso es que funciona.
 3. Arrancar el prototipo:
    ```bash
    docker compose up --build
@@ -65,11 +71,24 @@ El prototipo, como la web, solo necesita:
 ```sql
 GRANT SELECT, INSERT ON characters.character_support TO 'usuario'@'%';
 GRANT SELECT ON characters.characters TO 'usuario'@'%';
+-- Solo si se usa auth_db:
 GRANT SELECT ON auth.account TO 'usuario'@'%';
 GRANT SELECT ON auth.account_banned TO 'usuario'@'%';
 ```
 
 **Nunca** `UPDATE` ni `DELETE` sobre `character_support`.
+
+### BD auth (opcional)
+
+La BD de cuentas puede estar en otro servidor (por ejemplo, compartida entre reinos). Con `auth_db = null`
+el prototipo funciona solo con `characters`:
+
+- La cuenta destino se escribe por **id**, no por nombre, y no se comprueba que exista.
+- No se comprueban los bans.
+
+No se pierde nada: el worldserver repite esas comprobaciones y devuelve los códigos 20, 24 y 25. La **web
+real** sí tiene acceso a las cuentas (es donde inicia sesión el usuario), así que debe hacerlas antes de
+insertar para avisar al momento. Las consultas están en `CharacterSupport::findAccount` e `isAccountBanned`.
 
 ## Uso
 
@@ -117,7 +136,7 @@ error **1062** ("ya tienes una petición en curso"). Las peticiones cerradas no 
 | 1 | El personaje no existe o está borrado |
 | 2 | Parámetros inválidos |
 | 3 | Caducada (más de `CharacterSupport.ExpireHours` pendiente) |
-| 4 | Conectado, en la selección de personajes o desconectado hace menos de 60 s |
+| 4 | Conectado, entrando al mundo o desconectado hace menos de 60 s (en la selección de personajes sí se permite) |
 | 20 | La cuenta destino no existe |
 | 21 | Ya está en esa cuenta |
 | 22 | Cuenta destino sin huecos |

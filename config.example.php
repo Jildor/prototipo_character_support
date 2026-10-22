@@ -8,7 +8,9 @@ return [
         'user'          => 'usuario',
         'password'      => 'contraseña',
         'characters_db' => 'characters',
-        'auth_db'       => 'auth',
+        // BD de cuentas, solo si es accesible con esta misma conexión. null = sin ella: la cuenta destino se
+        // escribe por id y los bans y la existencia de la cuenta solo los comprueba el worldserver.
+        'auth_db'       => null,
     ],
 
     // Copia de los valores del worldserver.conf del reino, para las comprobaciones previas de la web

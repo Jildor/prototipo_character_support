@@ -55,7 +55,8 @@ async function checkConnection() {
         return;
     }
     const realm = r.data.realm;
-    $('connection').textContent = `Conectado a ${r.data.version} · cooldown de desatasco: ${realm.unstuck_cooldown_minutes} min`;
+    const auth = r.data.auth ? '' : ' · sin BD auth (cuenta destino por id; bans y existencia solo los comprueba el servidor)';
+    $('connection').textContent = `Conectado a ${r.data.version} · cooldown de desatasco: ${realm.unstuck_cooldown_minutes} min${auth}`;
 }
 
 // ---------------------------------------------------------------- Personaje
@@ -84,7 +85,7 @@ function renderCharacter() {
     $('character').innerHTML = `
         <dl class="info">
             <dt>Personaje</dt><dd><strong>${esc(c.name)}</strong> (guid ${c.guid}) ${state}</dd>
-            <dt>Cuenta</dt><dd>${esc(c.account_name ?? '¿?')} (id ${c.deleted ? c.deleteInfos_Account : c.account})</dd>
+            <dt>Cuenta</dt><dd>${c.account_name ? esc(c.account_name) + ' ' : ''}(id ${c.deleted ? c.deleteInfos_Account : c.account})</dd>
             <dt>Datos</dt><dd>Nivel ${c.level} · ${esc(RACES[c.race] ?? c.race)} · ${esc(CLASSES[c.class] ?? c.class)} · ${c.alliance ? 'Alianza' : 'Horda'}</dd>
             <dt>Posición</dt><dd>${esc(MAPS[c.map] ?? 'Mapa ' + c.map)} · zona ${c.zone}${c.in_flight ? ' · <strong>en vuelo</strong>' : ''}</dd>
             <dt>Última salida</dt><dd>${logout}</dd>
