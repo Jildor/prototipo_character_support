@@ -107,3 +107,11 @@ pre {
     font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
 }
 pre .params { color: var(--muted); }
+
+.credits { margin-bottom: 4px; }
+.credits form input { flex: 0 1 110px; }
+.cost { font-weight: normal; opacity: .85; }
+.badge.reserved { background: var(--pend-bg); color: var(--pend); }
+.badge.charged  { background: var(--ok-bg);   color: var(--ok); }
+.badge.refunded { background: var(--code-bg); color: var(--muted); }
+pre .db { color: var(--accent); font-weight: 600; }

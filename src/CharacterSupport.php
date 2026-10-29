@@ -17,6 +17,7 @@ final class CharacterSupport
 {
     public const TYPE_CHANGE_ACCOUNT = 10;
     public const TYPE_UNSTUCK        = 11;
+    public const TYPE_RESTORE        = 12;
 
     public const STATUS_PENDING = 0;
     public const STATUS_DONE    = 1;
@@ -25,6 +26,7 @@ final class CharacterSupport
     public const TYPE_NAMES = [
         self::TYPE_CHANGE_ACCOUNT => 'Cambio de cuenta',
         self::TYPE_UNSTUCK        => 'Desatascar',
+        self::TYPE_RESTORE        => 'Restaurar',
     ];
 
     public const STATUS_NAMES = [
@@ -44,13 +46,15 @@ final class CharacterSupport
         21 => 'El personaje ya está en esa cuenta.',
         22 => 'La cuenta de destino no tiene huecos libres para más personajes.',
         23 => 'La cuenta de destino ya tiene el máximo de Caballeros de la Muerte.',
-        24 => 'La cuenta de origen tiene un ban activo.',
+        24 => 'La cuenta del personaje tiene un ban activo.',
         25 => 'La cuenta de destino tiene un ban activo.',
         40 => 'El personaje estaba en una ruta de vuelo.',
         41 => 'El personaje estaba en un campo de batalla o arena.',
         42 => 'El Caballero de la Muerte todavía está en su zona de inicio.',
         43 => 'El personaje está en un mapa no válido.',
         44 => 'Este personaje ya se desatascó hace poco. Espera antes de volver a pedirlo.',
+        60 => 'El personaje no está borrado.',
+        61 => 'No se ha podido asignar el nombre temporal. Contacta con el staff.',
     ];
 
     private const ALLIANCE_RACES = [1, 3, 4, 7, 11];
@@ -84,7 +88,7 @@ final class CharacterSupport
         $guid = ctype_digit($nameOrGuid) ? (int) $nameOrGuid : 0;
 
         $row = $this->db->query(
-            "SELECT guid, COALESCE(name, deleteInfos_Name) AS name, account, deleteInfos_Account, race, class, level,
+            "SELECT guid, COALESCE(NULLIF(name, ''), deleteInfos_Name) AS name, account, deleteInfos_Account, deleteInfos_Name, race, class, level,
                     map, zone, online, logout_time, UNIX_TIMESTAMP() - logout_time AS logout_ago,
                     deleteDate, COALESCE(taxi_path, '') <> '' AS in_flight
              FROM characters
@@ -173,6 +177,24 @@ final class CharacterSupport
         )->fetchColumn();
 
         return max(0, (int) $remaining);
+    }
+
+    /** Estado de una petición para liquidar su cargo de créditos. null si la fila ya no existe. */
+    public function getRequestStatus(int $id): ?array
+    {
+        $row = $this->db->query('SELECT status, result_code FROM character_support WHERE id = ?', [$id])->fetch();
+        return $row ? ['status' => (int) $row['status'], 'result_code' => (int) $row['result_code']] : null;
+    }
+
+    /** Busca la petición de un cargo por su requested_by (ver Credits::requestTag). */
+    public function findRequestByTag(int $guid, string $requestedBy): ?int
+    {
+        $id = $this->db->query(
+            'SELECT id FROM character_support WHERE guid = ? AND requested_by = ? ORDER BY id DESC LIMIT 1',
+            [$guid, $requestedBy]
+        )->fetchColumn();
+
+        return $id === false ? null : (int) $id;
     }
 
     public function getRequest(int $id): ?array
@@ -273,6 +295,46 @@ final class CharacterSupport
         }
         if ($this->pendingRequestId($char['guid'], self::TYPE_CHANGE_ACCOUNT) !== null) {
             $errors[] = 'Ya hay una petición de cambio de cuenta en curso para este personaje.';
+        }
+        return $errors;
+    }
+
+    /**
+     * Nombre con el que el servidor restaurará el personaje: nombre borrado recortado + guid en hexadecimal,
+     * 12 caracteres como máximo. Solo para informar al usuario; el nombre lo pone el servidor.
+     */
+    public static function restoreTempName(int $guid, ?string $deletedName): string
+    {
+        $hex = strtoupper(dechex($guid));
+        return mb_substr($deletedName ?? '', 0, 12 - strlen($hex)) . $hex;
+    }
+
+    /** @return list<string> */
+    public function checkRestore(array $char): array
+    {
+        if (!$char['deleted']) {
+            return [self::RESULT_MESSAGES[60]];
+        }
+
+        // Se restaura siempre en su cuenta original
+        $errors = [];
+        $accountId = (int) $char['deleteInfos_Account'];
+        if ($this->hasAuth()) {
+            if (!$this->findAccount((string) $accountId)) {
+                $errors[] = 'La cuenta original del personaje ya no existe.';
+            } elseif ($this->isAccountBanned($accountId)) {
+                $errors[] = self::RESULT_MESSAGES[24];
+            }
+        }
+        if ($this->countCharacters($accountId) >= (int) $this->realm['characters_per_realm']) {
+            $errors[] = 'La cuenta no tiene huecos libres: borra otro personaje antes de restaurar este.';
+        }
+        if ($char['class'] === self::CLASS_DEATH_KNIGHT
+            && $this->countCharacters($accountId, self::CLASS_DEATH_KNIGHT) >= (int) $this->realm['death_knights_per_realm']) {
+            $errors[] = self::RESULT_MESSAGES[23];
+        }
+        if ($this->pendingRequestId($char['guid'], self::TYPE_RESTORE) !== null) {
+            $errors[] = 'Ya hay una petición de restauración en curso para este personaje.';
         }
         return $errors;
     }

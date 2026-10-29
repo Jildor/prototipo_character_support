@@ -10,6 +10,7 @@ const MAPS = {
 
 const $ = (id) => document.getElementById(id);
 let current = null;            // personaje seleccionado
+let costs = {};                // coste en créditos por tipo de petición
 const knownStatus = new Map(); // id de petición -> status, para resaltar los cambios
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -36,7 +37,8 @@ function renderSql(queries) {
     $('sql').innerHTML = queries.map((q) => {
         const sql = q.sql.replace(/\s+/g, ' ').trim();
         const params = q.params.length ? `\n<span class="params">-- parámetros: ${esc(JSON.stringify(q.params))}</span>` : '';
-        return `<pre>${esc(sql)}${params}</pre>`;
+        return `<pre><span class="db">-- BD ${esc(q.db)}</span>
+${esc(sql)}${params}</pre>`;
     }).join('');
 }
 
@@ -56,6 +58,11 @@ async function checkConnection() {
     }
     const realm = r.data.realm;
     const auth = r.data.auth ? '' : ' · sin BD auth (cuenta destino por id; bans y existencia solo los comprueba el servidor)';
+    costs = r.data.costs ?? {};
+    document.querySelectorAll(".cost").forEach((el) => {
+        const cost = +(costs[el.dataset.type] ?? 0);
+        el.textContent = cost ? `(${cost} créditos)` : "(gratis)";
+    });
     $('connection').textContent = `Conectado a ${r.data.version} · cooldown de desatasco: ${realm.unstuck_cooldown_minutes} min${auth}`;
 }
 
@@ -93,10 +100,20 @@ function renderCharacter() {
         </dl>`;
 
     $('actions').hidden = false;
+    $("credits-balance").innerHTML = `Créditos de la cuenta ${c.payer}: <strong id="balance">${c.balance}</strong>`;
+    $("change-checks").innerHTML = c.change_checks.length ? message("err", c.change_checks) : "";
     $('unstuck-dest').textContent = 'Destino: ' + (c.alliance ? 'Páramos de Poniente' : 'Los Baldíos') + '. El personaje debe estar desconectado.';
     $('unstuck-checks').innerHTML = c.unstuck_checks.length
         ? message('err', ['La web no permitiría pedirlo ahora:', ...c.unstuck_checks])
         : '';
+    $('restore-box').hidden = !c.deleted;
+    if (c.deleted) {
+        $('restore-info').textContent = `Vuelve a su cuenta original (id ${c.deleteInfos_Account}) con el nombre temporal `
+            + `"${c.restore_name}" y tendrá que elegir un nombre nuevo al entrar al juego.`;
+        $('restore-checks').innerHTML = c.restore_checks.length
+            ? message('err', ['La web no permitiría pedirlo ahora:', ...c.restore_checks])
+            : '';
+    }
     $('requests-filter').textContent = $('only-character').checked ? `· ${c.name}` : '';
 }
 
@@ -117,6 +134,10 @@ $('search-form').addEventListener('submit', (e) => {
     loadCharacter($('search').value);
 });
 
+$('btn-restore').addEventListener('click', () => {
+    sendRequest('restore', { guid: current.guid }, 'action-result');
+});
+
 $('btn-unstuck').addEventListener('click', () => {
     sendRequest('unstuck', { guid: current.guid }, 'action-result');
 });
@@ -131,6 +152,13 @@ $('raw-form').addEventListener('submit', (e) => {
     sendRequest('raw', { guid: +$('raw-guid').value, type: +$('raw-type').value, params: $('raw-params').value }, 'raw-result');
 });
 
+$("credits-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await api("set_credits", { body: { account: current.payer, credits: +$("credits-value").value } });
+    if (r.ok) $("balance").textContent = r.data.balance;
+    loadCharacter(String(current.guid), false);
+});
+
 $('only-character').addEventListener('change', () => {
     if (current) renderCharacter();
     refreshRequests();
@@ -140,11 +168,14 @@ $('only-character').addEventListener('change', () => {
 
 async function refreshRequests() {
     const guid = $('only-character').checked && current ? current.guid : 0;
-    const r = await api('requests', { query: { guid }, showSql: false });
+    const account = current?.payer ?? 0;
+    const r = await api("requests", { query: { guid, account }, showSql: false });
     if (!r.ok) return;
+    renderCharges(r.data.charges);
+    if (r.data.balance !== null && $("balance")) $("balance").textContent = r.data.balance;
 
     let currentChanged = false;
-    $('requests').innerHTML = r.data.map((req) => {
+    $("requests").innerHTML = r.data.requests.map((req) => {
         const prev = knownStatus.get(req.id);
         const changed = prev !== undefined && prev !== req.status;
         knownStatus.set(req.id, req.status);
@@ -164,6 +195,18 @@ async function refreshRequests() {
 
     // Si el servidor acaba de procesar una petición del personaje, se recargan sus datos (posición, cuenta…)
     if (currentChanged) loadCharacter(String(current.guid), false);
+}
+
+function renderCharges(charges) {
+    $("charges").innerHTML = charges.map((ch) => `<tr>
+        <td>${ch.id}</td>
+        <td>${ch.account_id}</td>
+        <td>${esc(ch.type_name)}<div class="muted">guid ${ch.guid}</div></td>
+        <td>${ch.request_id ?? "-"}</td>
+        <td>${ch.amount}</td>
+        <td><span class="badge ${esc(ch.state)}">${esc(ch.state_name)}</span>${ch.note ? `<div class="muted">${esc(ch.note)}</div>` : ""}</td>
+        <td>${esc(ch.created)}</td>
+    </tr>`).join("") || `<tr><td colspan="7" class="muted">Sin movimientos.</td></tr>`;
 }
 
 checkConnection();

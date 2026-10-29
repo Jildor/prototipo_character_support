@@ -20,6 +20,12 @@ return [
         'unstuck_cooldown_minutes' => 60, // CharacterSupport.Unstuck.Cooldown
     ],
 
-    // Se guarda en character_support.requested_by
+    // Créditos (simulados en data/web.sqlite, que hace de BD de la web). Si falta este bloque se usan estos valores
+    'credits' => [
+        'initial_balance' => 100,                 // saldo con el que empieza cada cuenta
+        'costs'           => [10 => 50, 11 => 0, 12 => 30], // coste por tipo de petición; 0 = gratis
+    ],
+
+    // Se guarda en character_support.requested_by (con ":charge:<id>" detrás si la petición se cobra)
     'requested_by' => 'prototipo',
 ];

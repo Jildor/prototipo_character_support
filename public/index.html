@@ -25,16 +25,31 @@
 
         <div class="card" id="actions" hidden>
             <h2>2. Pedir soporte</h2>
+            <div class="row between credits">
+                <span id="credits-balance"></span>
+                <form id="credits-form" class="row" title="Solo para pruebas: fija el saldo de la cuenta que paga">
+                    <input id="credits-value" type="number" min="0" placeholder="Saldo" required>
+                    <button>Fijar saldo</button>
+                </form>
+            </div>
+
+            <div id="restore-box" hidden>
+                <h3>Restaurar personaje borrado</h3>
+                <p class="muted" id="restore-info"></p>
+                <div id="restore-checks"></div>
+                <button id="btn-restore">Restaurar personaje <span class="cost" data-type="12"></span></button>
+            </div>
 
             <h3>Desatascar</h3>
             <p class="muted" id="unstuck-dest"></p>
             <div id="unstuck-checks"></div>
-            <button id="btn-unstuck">Desatascar personaje</button>
+            <button id="btn-unstuck">Desatascar personaje <span class="cost" data-type="11"></span></button>
 
             <h3>Cambiar de cuenta</h3>
+            <div id="change-checks"></div>
             <form id="change-form" class="row">
                 <input id="target-account" placeholder="Cuenta destino (id, o nombre si hay BD auth)" autocomplete="off" required>
-                <button>Cambiar de cuenta</button>
+                <button>Cambiar de cuenta <span class="cost" data-type="10"></span></button>
             </form>
 
             <label class="check">
@@ -72,6 +87,20 @@
                     <tr><th>id</th><th>Personaje</th><th>Acción</th><th>Estado</th><th>Resultado</th><th>Creada</th><th>Espera</th></tr>
                     </thead>
                     <tbody id="requests"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>4. Créditos <span class="muted small">(BD de la web)</span></h2>
+            <p class="muted small">Se reservan al crear la petición, se cobran si el servidor la hace (status 1) y se
+                devuelven si la rechaza o caduca (status 2).</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr><th>Cargo</th><th>Cuenta</th><th>Acción</th><th>Petición</th><th>Importe</th><th>Estado</th><th>Creado</th></tr>
+                    </thead>
+                    <tbody id="charges"></tbody>
                 </table>
             </div>
         </div>

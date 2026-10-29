@@ -1,7 +1,7 @@
 # prototipo_character_support
 
 Prototipo de ejemplo del sistema **Character Support** de NaerEmu: la web pide acciones sobre personajes
-(desatascar, cambiar de cuenta) insertando filas en `characters.character_support`, y el worldserver las procesa.
+(desatascar, cambiar de cuenta, restaurar personajes borrados) insertando filas en `characters.character_support`, y el worldserver las procesa.
 
 El objetivo es que el equipo web vea el funcionamiento completo y sepa qué tiene que implementar. **No es código
 para producción**: no tiene inicio de sesión y deja saltarse las comprobaciones para hacer pruebas.
@@ -96,19 +96,25 @@ insertar para avisar al momento. Las consultas están en `CharacterSupport::find
 
 1. **Buscar personaje** por nombre o guid. Muestra cuenta, estado (conectado o borrado), posición, última salida
    y si puede desatascarse.
-2. **Pedir soporte**: desatascar o cambiar de cuenta. La web hace sus comprobaciones previas y, si pasan, inserta
-   la petición.
+2. **Pedir soporte**: restaurar (si está borrado), desatascar o cambiar de cuenta. La web hace sus comprobaciones
+   previas, reserva los créditos y, si todo pasa, inserta la petición.
+   - Arriba se ve el saldo de la cuenta que paga; *Fijar saldo* lo cambia para probar el caso sin créditos.
    - *Saltar las comprobaciones de la web* inserta igualmente, para comprobar que el servidor rechaza los casos
      inválidos por su cuenta.
 3. **Peticiones**: lista que se actualiza cada 3 s. Verás la fila en *Pendiente* hasta el siguiente ciclo del
    worldserver y luego en *Hecho* o *Error* con el motivo.
-4. **SQL de la última acción**: las consultas exactas que ha lanzado la web, con sus parámetros.
-5. **Inserción manual**: inserta sin comprobar nada (JSON mal formado, parámetros inválidos, tipos desconocidos).
+4. **Créditos**: cargos del personaje. Se reservan al pedir, pasan a *Cobrado* si el servidor hace la petición y
+   a *Devuelto* si la rechaza o caduca. Se guardan en `data/web.sqlite`, que hace de BD de la web (bórralo para
+   empezar de cero). Los costes se configuran en `config.php` (bloque `credits`).
+5. **SQL de la última acción**: las consultas exactas que ha lanzado la web, con sus parámetros y la BD
+   (`characters` o `web`).
+6. **Inserción manual**: inserta sin comprobar nada ni cobrar (JSON mal formado, parámetros inválidos, tipos
+   desconocidos).
 
 ## Para el equipo web
 
 Todo lo necesario para implementarlo en la web real (tabla, tipos, códigos de resultado, consultas, flujo de cada
-acción, seguridad y casos especiales) está en **[docs/INTEGRACION.md](docs/INTEGRACION.md)**.
+acción, seguridad, cobro con créditos y casos especiales) está en **[docs/INTEGRACION.md](docs/INTEGRACION.md)**.
 
 ## Ficheros
 
@@ -116,7 +122,9 @@ acción, seguridad y casos especiales) está en **[docs/INTEGRACION.md](docs/INT
 |---|---|
 | `docs/INTEGRACION.md` | **Guía para el equipo web** |
 | `src/CharacterSupport.php` | **Lógica de la web**: comprobaciones, inserción y consulta. Es lo que hay que reproducir |
+| `src/Credits.php` | **Cobro con créditos**: reservar, cobrar o devolver según el resultado del servidor |
 | `src/Db.php` | Conexión PDO. Registra el SQL ejecutado solo para mostrarlo en el prototipo |
 | `public/api.php` | API JSON que usa la página |
 | `public/index.html`, `app.js`, `style.css` | Interfaz |
 | `config.example.php` | Plantilla de configuración (`config.php` no se sube a git) |
+| `data/web.sqlite` | BD simulada de la web con los créditos. Se crea sola y no se sube a git |
